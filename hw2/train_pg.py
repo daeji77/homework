@@ -12,6 +12,8 @@ from multiprocessing import Process
 # Utilities
 #============================================================================================#
 
+EPSILON = 1.0e-6
+
 def build_mlp(
         input_placeholder, 
         output_size,
@@ -35,11 +37,20 @@ def build_mlp(
 
     with tf.variable_scope(scope):
         # YOUR_CODE_HERE
-        pass
+        net = input_placeholder
+        for _ in range(n_layers):
+            net = tf.layers.dense(net, size, activation=activation)
+        net = tf.layers.dense(net, output_size, activation=output_activation)
+    return net
+
 
 def pathlength(path):
     return len(path["reward"])
 
+
+def assert_shape(tensor, shape):
+    """Assert the tensor shape."""
+    tensor.shape.assert_is_compatible_with(shape)
 
 
 #============================================================================================#
@@ -123,7 +134,7 @@ def train_PG(exp_name='',
         sy_ac_na = tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32) 
 
     # Define a placeholder for advantages
-    sy_adv_n = TODO
+    sy_adv_n = tf.placeholder(shape=[None], name="adv", dtype=tf.float32)
 
 
     #========================================================================================#
@@ -167,10 +178,14 @@ def train_PG(exp_name='',
 
     if discrete:
         # YOUR_CODE_HERE
-        sy_logits_na = TODO
-        sy_sampled_ac = TODO # Hint: Use the tf.multinomial op
-        sy_logprob_n = TODO
+        sy_logits_na = build_mlp(sy_ob_no, ac_dim, "mlp")
+        assert_shape(sy_logits_na, [None, ac_dim])
 
+        sy_sampled_ac = tf.squeeze(tf.multinomial(sy_logits_na, 1), axis=[1])
+        assert_shape(sy_sampled_ac, [None])
+
+        sy_logprob_n = tf.reduce_sum(
+                sy_logits_na * tf.one_hot(sy_ac_na, ac_dim), 1)
     else:
         # YOUR_CODE_HERE
         sy_mean = TODO
@@ -185,7 +200,13 @@ def train_PG(exp_name='',
     # Loss Function and Training Operation
     #========================================================================================#
 
-    loss = TODO # Loss function that we'll differentiate to get the policy gradient.
+    # Loss function that we'll differentiate to get the policy gradient.
+    # The following loss does not work.
+    #   loss = -sy_adv_n * sy_logprob_n
+    loss = sy_adv_n * tf.nn.softmax_cross_entropy_with_logits(
+            labels=tf.one_hot(sy_ac_na, ac_dim),
+            logits=sy_logits_na)
+    assert_shape(loss, [None])
     update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
 
@@ -204,8 +225,10 @@ def train_PG(exp_name='',
         # Define placeholders for targets, a loss function and an update op for fitting a 
         # neural network baseline. These will be used to fit the neural network baseline. 
         # YOUR_CODE_HERE
-        baseline_update_op = TODO
-
+        # Baseline target
+        sy_baseline_n = tf.placeholder(shape=[None], name="baseline", dtype=tf.float32)
+        baseline_loss = tf.nn.l2_loss(beseline_prediction - sy_baseline_n)
+        baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baselie_loss)
 
     #========================================================================================#
     # Tensorflow Engineering: Config, Session, Variable initialization
@@ -317,7 +340,24 @@ def train_PG(exp_name='',
         #====================================================================================#
 
         # YOUR_CODE_HERE
-        q_n = TODO
+        q_n = []
+        if reward_to_go:
+            for path in paths:
+                discount = 1.0
+                total_reward = 0.0
+                for reward in path["reward"]:
+                    total_reward += discount * reward
+                    discount *= gamma
+                q_n.extend([total_reward,] * len(path["reward"]))
+        else:
+            for path in paths:
+                q_path = []
+                q_accumulated = 0.0
+                for reward in reversed(path["reward"]):
+                    q_accumulated = reward + gamma * q_accumulated
+                    q_path.append(q_accumulated)
+                q_n.extend(list(reversed(q_path)))
+        q_n = np.array(q_n)
 
         #====================================================================================#
         #                           ----------SECTION 5----------
@@ -332,8 +372,10 @@ def train_PG(exp_name='',
             # Hint #bl1: rescale the output from the nn_baseline to match the statistics
             # (mean and std) of the current or previous batch of Q-values. (Goes with Hint
             # #bl2 below.)
-
-            b_n = TODO
+            b_n = []
+            for ob in ob_no:
+                b_n.append(sess.run(baseline_prediction, feed_dict={sy_ob_no : ob_no}))
+            b_n = np.mean(q_n) + b_n * np.std(q_n)
             adv_n = q_n - b_n
         else:
             adv_n = q_n.copy()
@@ -347,7 +389,7 @@ def train_PG(exp_name='',
             # On the next line, implement a trick which is known empirically to reduce variance
             # in policy gradient methods: normalize adv_n to have mean zero and std=1. 
             # YOUR_CODE_HERE
-            pass
+            adv_n = (adv_n - np.mean(adv_n)) / (np.std(adv_n) + EPSILON)
 
 
         #====================================================================================#
@@ -366,7 +408,8 @@ def train_PG(exp_name='',
             # targets to have mean zero and std=1. (Goes with Hint #bl1 above.)
 
             # YOUR_CODE_HERE
-            pass
+            baseline_n = (q_n - np.mean(q_n)) / (np.std(q_n) + EPSILON)
+
 
         #====================================================================================#
         #                           ----------SECTION 4----------
@@ -380,7 +423,9 @@ def train_PG(exp_name='',
         # and after an update, and then log them below. 
 
         # YOUR_CODE_HERE
-
+        sess.run(update_op, feed_dict={sy_ob_no : ob_no, sy_ac_na : ac_na, sy_adv_n : adv_n})
+        if nn_baseline:
+            sess.run(baseline_update_op, feed_dict={sy_ob_no : ob_no, sy_baseline_n : baseline_n})
 
         # Log diagnostics
         returns = [path["reward"].sum() for path in paths]
