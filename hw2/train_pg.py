@@ -184,8 +184,8 @@ def train_PG(exp_name='',
         sy_sampled_ac = tf.squeeze(tf.multinomial(sy_logits_na, 1), axis=[1])
         assert_shape(sy_sampled_ac, [None])
 
-        sy_logprob_n = tf.reduce_sum(
-                sy_logits_na * tf.one_hot(sy_ac_na, ac_dim), 1)
+        sy_logprob_n = tf.log(tf.reduce_sum(
+            tf.nn.softmax(sy_logits_na) * tf.one_hot(sy_ac_na, ac_dim), 1))
     else:
         # YOUR_CODE_HERE
         sy_mean = TODO
@@ -202,10 +202,10 @@ def train_PG(exp_name='',
 
     # Loss function that we'll differentiate to get the policy gradient.
     # The following loss does not work.
-    #   loss = -sy_adv_n * sy_logprob_n
-    loss = sy_adv_n * tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.one_hot(sy_ac_na, ac_dim),
-            logits=sy_logits_na)
+    loss = -sy_adv_n * sy_logprob_n
+#    loss = sy_adv_n * tf.nn.softmax_cross_entropy_with_logits(
+#            labels=tf.one_hot(sy_ac_na, ac_dim),
+#            logits=sy_logits_na)
     assert_shape(loss, [None])
     update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
