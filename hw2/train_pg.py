@@ -235,8 +235,8 @@ def train_PG(exp_name='',
         # YOUR_CODE_HERE
         # Baseline target
         sy_baseline_n = tf.placeholder(shape=[None], name="baseline", dtype=tf.float32)
-        baseline_loss = tf.nn.l2_loss(beseline_prediction - sy_baseline_n)
-        baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baselie_loss)
+        baseline_loss = tf.nn.l2_loss(baseline_prediction - sy_baseline_n)
+        baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baseline_loss)
 
     #========================================================================================#
     # Tensorflow Engineering: Config, Session, Variable initialization
@@ -380,9 +380,7 @@ def train_PG(exp_name='',
             # Hint #bl1: rescale the output from the nn_baseline to match the statistics
             # (mean and std) of the current or previous batch of Q-values. (Goes with Hint
             # #bl2 below.)
-            b_n = []
-            for ob in ob_no:
-                b_n.append(sess.run(baseline_prediction, feed_dict={sy_ob_no : ob_no}))
+            b_n = sess.run(baseline_prediction, feed_dict={sy_ob_no : ob_no})
             b_n = np.mean(q_n) + b_n * np.std(q_n)
             adv_n = q_n - b_n
         else:
