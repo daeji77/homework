@@ -211,10 +211,13 @@ def train_PG(exp_name='',
     # Loss function that we'll differentiate to get the policy gradient.
     # The following loss does not work.
     loss = -sy_adv_n * sy_logprob_n
-#    loss = sy_adv_n * tf.nn.softmax_cross_entropy_with_logits(
-#            labels=tf.one_hot(sy_ac_na, ac_dim),
-#            logits=sy_logits_na)
+
+    # The following code is the same as above for discrete. It does not work for continuous.
+    #    loss = sy_adv_n * tf.nn.softmax_cross_entropy_with_logits(
+    #            labels=tf.one_hot(sy_ac_na, ac_dim),
+    #            logits=sy_logits_na)
     assert_shape(loss, [None])
+
     update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
 
