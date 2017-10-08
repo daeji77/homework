@@ -195,10 +195,11 @@ def train_PG(exp_name='',
         # logstd should just be a trainable variable, not a network output.
         sy_logstd = tf.get_variable("logstd", shape=[ac_dim], dtype=tf.float32,
                                     initializer=tf.zeros_initializer())
-        sy_sampled_ac = sy_mean + tf.exp(sy_logstd) * tf.random_normal(shape=tf.shape(sy_mean))
+        sy_std = tf.exp(sy_logstd)
+        sy_sampled_ac = sy_mean + sy_std * tf.random_normal(shape=tf.shape(sy_mean))
 
         # Hint: Use the log probability under a multivariate gaussian. 
-        dist = tf.contrib.distributions.MultivariateNormalDiag(sy_mean, tf.exp(sy_logstd))
+        dist = tf.contrib.distributions.MultivariateNormalDiag(sy_mean, sy_std)
         sy_logprob_n = dist.prob(sy_ac_na)
 
 
