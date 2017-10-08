@@ -4,6 +4,7 @@ import gym
 import logz
 import scipy.signal
 import os
+import roboschool
 import time
 import inspect
 from multiprocessing import Process
@@ -39,8 +40,10 @@ def build_mlp(
         # YOUR_CODE_HERE
         net = input_placeholder
         for _ in range(n_layers):
-            net = tf.layers.dense(net, size, activation=activation)
-        net = tf.layers.dense(net, output_size, activation=output_activation)
+            net = tf.layers.dense(net, size, activation=activation,
+                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
+        net = tf.layers.dense(net, output_size, activation=output_activation,
+                              kernel_initializer=tf.contrib.layers.xavier_initializer())
     return net
 
 
@@ -188,11 +191,15 @@ def train_PG(exp_name='',
             tf.nn.softmax(sy_logits_na) * tf.one_hot(sy_ac_na, ac_dim), 1))
     else:
         # YOUR_CODE_HERE
-        sy_mean = TODO
-        sy_logstd = TODO # logstd should just be a trainable variable, not a network output.
-        sy_sampled_ac = TODO
-        sy_logprob_n = TODO  # Hint: Use the log probability under a multivariate gaussian. 
+        sy_mean = build_mlp(sy_ob_no, ac_dim, "mlp")
+        # logstd should just be a trainable variable, not a network output.
+        sy_logstd = tf.get_variable("logstd", shape=[ac_dim], dtype=tf.float32,
+                                    initializer=tf.zeros_initializer())
+        sy_sampled_ac = sy_mean + tf.exp(sy_logstd) * tf.random_normal(shape=tf.shape(sy_mean))
 
+        # Hint: Use the log probability under a multivariate gaussian. 
+        dist = tf.contrib.distributions.MultivariateNormalDiag(sy_mean, tf.exp(sy_logstd))
+        sy_logprob_n = dist.prob(sy_ac_na)
 
 
     #========================================================================================#
