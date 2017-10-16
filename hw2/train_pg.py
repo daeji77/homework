@@ -354,20 +354,20 @@ def train_PG(exp_name='',
         q_n = []
         if reward_to_go:
             for path in paths:
-                discount = 1.0
-                total_reward = 0.0
-                for reward in path["reward"]:
-                    total_reward += discount * reward
-                    discount *= gamma
-                q_n.extend([total_reward,] * len(path["reward"]))
-        else:
-            for path in paths:
                 q_path = []
                 q_accumulated = 0.0
                 for reward in reversed(path["reward"]):
                     q_accumulated = reward + gamma * q_accumulated
                     q_path.append(q_accumulated)
                 q_n.extend(list(reversed(q_path)))
+        else:
+            for path in paths:
+                discount = 1.0
+                total_reward = 0.0
+                for reward in path["reward"]:
+                    total_reward += discount * reward
+                    discount *= gamma
+                q_n.extend([total_reward,] * len(path["reward"]))
         q_n = np.array(q_n)
 
         #====================================================================================#
