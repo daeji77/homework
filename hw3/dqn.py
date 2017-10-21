@@ -214,7 +214,8 @@ def learn(env,
             action = np.random.randint(num_actions)
         else:
             recent_obs = replay_buffer.encode_recent_observation()
-            action = sess.run(best_action, feed_dict={obs_t_ph: recent_obs})
+            recent_obs = np.expand_dims(recent_obs, axis = 0)
+            action = session.run(best_action, feed_dict={obs_t_ph: recent_obs})
         last_obs, reward, done, info = env.step(action)
         replay_buffer.store_effect(idx, action, reward, done)
         if done == 1.0:
@@ -282,7 +283,7 @@ def learn(env,
                 model_initialized = True
 
             # 3.c: Train the model.
-            sess.run(train_fn, feed_dict={
+            session.run(train_fn, feed_dict={
                     obs_t_ph: obs_t_batch,
                     act_t_ph: act_batch,
                     rew_t_ph: rew_batch,
